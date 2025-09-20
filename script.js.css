@@ -1,0 +1,162 @@
+
+// Datos iniciales (modificalos según tus productos)
+const productos = [
+  { id:1, nombre:"Almendras 250g", precio:1200, img:"https://picsum.photos/seed/almendra/600/400", descripcion:"Almendras seleccionadas, crujientes." },
+  { id:2, nombre:"Nueces 200g", precio:1400, img:"https://picsum.photos/seed/nuez/600/400", descripcion:"Nueces frescas ideales para repostería." },
+  { id:3, nombre:"Mix energético 300g", precio:1100, img:"https://picsum.photos/seed/mix/600/400", descripcion:"Mezcla de frutos secos y frutas deshidratadas." },
+  { id:4, nombre:"Maní tostado 250g", precio:700, img:"https://picsum.photos/seed/mani/600/400", descripcion:"Maní tostado con sal marina." },
+  { id:5, nombre:"Pistachos 150g", precio:1800, img:"https://picsum.photos/seed/pista/600/400", descripcion:"Pistachos naturales y sabrosos." },
+  { id:6, nombre:"Avellanas 200g", precio:1600, img:"https://picsum.photos/seed/avellana/600/400", descripcion:"Avellanas para postres y snacks." }
+];
+
+// Render productos
+const grid = document.getElementById('productos-grid');
+productos.forEach(p=>{
+  const card = document.createElement('div');
+  card.className = 'producto-card';
+  card.innerHTML = `
+    <img src="${p.img}" alt="${p.nombre}" loading="lazy">
+    <div>
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <h3 style="margin:.2rem 0">${p.nombre}</h3>
+        <div class="price">$${(p.precio).toFixed(0)}</div>
+      </div>
+      <p class="small">${p.descripcion}</p>
+      <div style="margin-top:.6rem;display:flex;gap:.5rem">
+        <button class="btn add-to-cart" data-id="${p.id}">Agregar</button>
+      </div>
+    </div>
+  `;
+  grid.appendChild(card);
+});
+
+// Carrito (localStorage)
+let cart = JSON.parse(localStorage.getItem('cart_v1')) || [];
+
+function saveCart(){
+  localStorage.setItem('cart_v1', JSON.stringify(cart));
+  document.getElementById('cart-count').textContent = cart.reduce((s,i)=>s+i.cantidad,0);
+  document.getElementById('cart-total').textContent = calcularTotal().toFixed(2);
+}
+
+function agregarAlCarrito(id){
+  const producto = productos.find(p=>p.id===id);
+  const existente = cart.find(i=>i.id===id);
+  if(existente){ existente.cantidad += 1; }
+  else { cart.push({id:producto.id,nombre:producto.nombre,precio:producto.precio,img:producto.img,cantidad:1}); }
+  saveCart();
+  alert(`${producto.nombre} agregado al carrito`);
+}
+
+function calcularTotal(){
+  return cart.reduce((sum,i)=>sum + i.precio * i.cantidad, 0);
+}
+
+document.addEventListener('click', e=>{
+  if(e.target.matches('.add-to-cart')) {
+    const id = Number(e.target.dataset.id);
+    agregarAlCarrito(id);
+  }
+});
+
+saveCart();
+
+// Modal carrito
+const cartModal = document.getElementById('cart-modal');
+const cartItemsEl = document.getElementById('cart-items');
+
+function abrirCarrito(){
+  renderCartItems();
+  cartModal.style.display = 'flex';
+  cartModal.setAttribute('aria-hidden','false');
+}
+
+function cerrarCarrito(){
+  cartModal.style.display = 'none';
+  cartModal.setAttribute('aria-hidden','true');
+}
+
+document.getElementById('view-cart').addEventListener('click', (e)=>{
+  e.preventDefault(); abrirCarrito();
+});
+document.getElementById('close-cart').addEventListener('click', cerrarCarrito);
+cartModal.addEventListener('click', (e)=>{ if(e.target === cartModal) cerrarCarrito(); });
+
+function renderCartItems(){
+  cartItemsEl.innerHTML = '';
+  if(cart.length === 0){
+    cartItemsEl.innerHTML = '<p class="small">El carrito está vacío.</p>';
+    document.getElementById('cart-total').textContent = '0.00';
+    return;
+  }
+  cart.forEach(item=>{
+    const div = document.createElement('div');
+    div.className = 'cart-item';
+    div.innerHTML = `
+      <img src="${item.img}" alt="${item.nombre}">
+      <div style="flex:1">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <strong>${item.nombre}</strong>
+          <div class="small price">$${item.precio}</div>
+        </div>
+        <div class="small">Cantidad:
+          <button class="qty" data-op="dec" data-id="${item.id}">−</button>
+          <span style="padding:0 .5rem">${item.cantidad}</span>
+          <button class="qty" data-op="inc" data-id="${item.id}">+</button>
+          <button class="remove small" data-id="${item.id}" style="margin-left:1rem">Eliminar</button>
+        </div>
+      </div>
+    `;
+    cartItemsEl.appendChild(div);
+  });
+  document.getElementById('cart-total').textContent = calcularTotal().toFixed(2);
+  document.querySelectorAll('.qty').forEach(btn=>{
+    btn.addEventListener('click', (ev)=>{
+      const id = Number(ev.target.dataset.id);
+      const op = ev.target.dataset.op;
+      const item = cart.find(i=>i.id===id);
+      if(!item) return;
+      if(op==='inc') item.cantidad += 1;
+      if(op==='dec'){ item.cantidad = Math.max(1, item.cantidad - 1); }
+      saveCart(); renderCartItems();
+    });
+  });
+  document.querySelectorAll('.remove').forEach(btn=>{
+    btn.addEventListener('click', (ev)=>{
+      const id = Number(ev.target.dataset.id);
+      cart = cart.filter(i=>i.id!==id);
+      saveCart(); renderCartItems();
+    });
+  });
+}
+
+// Checkout (simple: arma un email con pedido)
+document.getElementById('checkout').addEventListener('click', ()=>{
+  if(cart.length === 0) { alert('El carrito está vacío'); return; }
+  const total = calcularTotal().toFixed(2);
+  let body = `Hola,%0A%0ONuevo pedido desde la web:%0A%0A`;
+  cart.forEach(i=>{
+    body += `${i.cantidad} x ${i.nombre} — $${(i.precio).toFixed(0)}%0A`;
+  });
+  body += `%0ATotal: $${total}%0A%0AContacto:%0A`;
+  const mail = `mailto:tuemail@ejemplo.com?subject=Pedido%20web%20-%20Frutos%20&%20Sabores&body=${body}`;
+  window.location.href = mail;
+});
+
+// Contact form -> mailto fallback
+document.getElementById('contact-form').addEventListener('submit', (e)=>{
+  e.preventDefault();
+  const nombre = document.getElementById('nombre').value;
+  const email = document.getElementById('email').value;
+  const mensaje = document.getElementById('mensaje').value;
+  const subject = encodeURIComponent(`Contacto web: ${nombre}`);
+  const body = encodeURIComponent(`Nombre: ${nombre}\nEmail: ${email}\n\nMensaje:\n${mensaje}`);
+  window.location.href = `mailto:dominguez.o.gaston@gmail.com?subject=${subject}&body=${body}`;
+});
+
+// UI extras
+document.getElementById('year').textContent = new Date().getFullYear();
+document.getElementById('btn-menu').addEventListener('click', ()=>{
+  const nav = document.getElementById('nav-list');
+  nav.style.display = nav.style.display === 'block' ? 'none' : 'block';
+});
